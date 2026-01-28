@@ -1,0 +1,143 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<title>Simple Maglev Project</title>
+<style>
+body {
+font-family: sans-serif;
+background: #f0f0f0;
+text-align: center;
+padding: 20px;
+}
+canvas {
+background: #fff;
+border: 4px solid #333;
+border-radius: 10px;
+box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+.controls {
+margin-top: 20px;
+padding: 20px;
+background: #ddd;
+display: inline-block;
+border-radius: 10px;
+}
+label {
+display: block;
+font-size: 1.2rem;
+margin: 10px 0;
+font-weight: bold;
+}
+input[type=range] { width: 300px; }
+#status { font-size: 1.5rem; font-weight: bold; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<h1>Maglev Train Demo</h1>
+<!-- The visual screen -->
+<canvas id="simCanvas" width="600" height="300"></canvas>
+
+<!-- The user inputs -->
+<div class="controls">
+<label>
+1. Magnet Power (Lift):
+<input type="range" id="liftSlider" min="0" max="100" value="0">
+</label>
+<label>
+2. Engine Thrust (Speed):
+<input type="range" id="speedSlider" min="0" max="100" value="0">
+</label>
+
+<div id="status">Status: Stopped</div>
+</div>
+
+<script>
+// 1. Setup the Canvas
+const ctx = document.getElementById('simCanvas').getContext('2d');
+const liftInput = document.getElementById('liftSlider');
+const speedInput = document.getElementById('speedSlider');
+const statusText = document.getElementById('status');
+
+let trackPosition = 0; // Used to animate the background moving
+
+// 2. The Main Loop (Runs 60 times a second)
+function draw() {
+// --- INPUTS ---
+let magnetStrength = parseInt(liftInput.value);
+let enginePower = parseInt(speedInput.value);
+
+// --- LOGIC ---
+// Simulating Gravity: We need at least 30% magnet power to lift the heavy train
+let isLevitating = magnetStrength > 30;
+// Levitation Height: If levitating, go up 40px. If not, stay at 0.
+let height = isLevitating ? 40 : 0;
+
+// Speed Logic: We can only move if we are not touching the ground (Friction)
+let speed = isLevitating ? enginePower : 0;
+
+// --- DRAWING ---
+// Clear the screen
+ctx.clearRect(0, 0, 600, 300);
+
+// Draw Sky
+ctx.fillStyle = "#87CEEB"; // Sky Blue
+ctx.fillRect(0, 0, 600, 300);
+
+// Draw Track (Move it left to create illusion of speed)
+trackPosition -= speed * 0.2;
+ctx.fillStyle = "#555"; // Dark Gray Rail
+ctx.fillRect(0, 250, 600, 20); // The Ground Rail
+
+// Draw the "sleepers" (stripes on track)
+ctx.fillStyle = "#333";
+for(let i = 0; i < 800; i+=50) {
+// Math to make lines wrap around the screen
+let x = (i + trackPosition) % 600;
+if(x < 0) x += 600;
+ctx.fillRect(x, 250, 10, 20);
+}
+
+// Draw the Train
+// Y Position = Ground (250) - TrainHeight (50) - LevitationHeight
+let trainY = 250 - 50 - height;
+
+// Magnetic Field Effect (Only if magnets are on)
+if(magnetStrength > 0) {
+ctx.fillStyle = `rgba(0, 255, 255, ${magnetStrength/100})`; // Cyan glow
+ctx.fillRect(200, trainY + 50, 200, height); // Field under train
+}
+
+// Train Body
+ctx.fillStyle = isLevitating ? "blue" : "gray"; // Turns blue when working
+ctx.fillRect(200, trainY, 200, 50);
+
+// Train Windows
+ctx.fillStyle = "white";
+ctx.fillRect(220, trainY + 10, 50, 20);
+ctx.fillRect(330, trainY + 10, 50, 20);
+
+// --- STATUS UPDATE ---
+if (isLevitating) {
+statusText.innerText = "Levitating! Speed: " + speed + " mph";
+statusText.style.color = "green";
+} else {
+statusText.innerText = "Friction Detected! (Increase Magnet Power)";
+statusText.style.color = "red";
+}
+
+// Repeat the loop
+requestAnimationFrame(draw);
+}
+
+// Start the animation
+draw();
+</script>
+</body>
+</html>
+
+
+Gaurav Arutla
+
+Grade 10
