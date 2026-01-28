@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maglev Engineering Simulation</title>
+<style>
+:root {
+--bg-dark: #0f172a;
+--panel-bg: #1e293b;
+--accent: #0ea5e9; /* Sky blue */
+--accent-glow: rgba(14, 165, 233, 0.4);
+--danger: #ef4444;
+--success: #22c55e;
+--text-main: #f8fafc;
+--text-dim: #94a3b8;
+--coil-off: #475569;
+--coil-on: #3b82f6;
+}
+
+* {
+box-sizing: border-box;
+user-select: none;
+}
+
+body {
+margin: 0;
+padding: 0;
+background-color: var(--bg-dark);
+color: var(--text-main);
+font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+height: 100vh;
+display: flex;
+flex-direction: column;
+overflow: hidden;
+}
+
+/* --- Header --- */
+header {
+background-color: var(--panel-bg);
+padding: 0 20px;
+height: 60px;
+display: flex;
+align-items: center;
+justify-content: space-between;
+border-bottom: 2px solid var(--accent);
+box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+z-index: 10;
+}
+
+.brand {
+font-size: 1.2rem;
+font-weight: 700;
+letter-spacing: 1px;
+color: var(--accent);
+display: flex;
+align-items: center;
+gap: 10px;
+}
+
+.brand span { color: white; }
+
+.system-status {
+font-family: 'Courier New', monospace;
+font-weight: bold;
+display: flex;
+align-items: center;
+gap: 8px;
+font-size: 0.9rem;
+}
+
+.status-dot {
+width: 10px;
+height: 10px;
+border-radius: 50%;
+background-color: var(--coil-off);
+box-shadow: 0 0 5px var(--coil-off);
+transition: all 0.3s ease;
+}
+
+.status-dot.active { background-color: var(--success); box-shadow: 0 0 8px var(--success); }
+.status-dot.danger { background-color: var(--danger); box-shadow: 0 0 8px var(--danger); animation: pulse 1s infinite; }
+
+@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+/* --- Main Layout --- */
+.main-container {
+display: grid;
+grid-template-columns: 320px 1fr 300px;
+flex: 1;
+overflow: hidden;
+}
+
+/* --- Panels --- */
+.panel {
+background-color: var(--panel-bg);
+padding: 20px;
+display: flex;
+flex-direction: column;
+gap: 20px;
+overflow-y: auto;
+border-right: 1px solid #334155;
+}
+
+.panel-right {
+border-right: none;
+border-left: 1px solid #334155;
+}
+
+h3 {
+margin: 0 0 10px 0;
+font-size: 0.95rem;
+text-transform: uppercase;
+color: var(--text-dim);
+border-bottom: 1px solid #334155;
+padding-bottom: 5px;
+}
+
+/* --- Controls --- */
+.control-group {
+background: rgba(0,0,0,0.2);
+padding: 15px;
+border-radius: 8px;
+border: 1px solid #334155;
+}
+
+.control-header {
+display: flex;
+justify-content: space-between;
+margin-bottom: 8px;
+font-size: 0.9rem;
+font-weight: 600;
+}
+
+.control-value {
+color: var(--accent);
+font-family: 'Courier New', monospace;
+}
+
+input[type="range"] {
+width: 100%;
+height: 6px;
+background: #475569;
+border-radius: 3px;
+outline: none;
+-webkit-appearance: none;
+cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+-webkit-appearance: none;
+width: 18px;
+height: 18px;
+background: var(--accent);
+border-radius: 50%;
+cursor: pointer;
+box-shadow: 0 0 10px rgba(0,0,0,0.5);
+transition: transform 0.1s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+transform: scale(1.2);
+}
+
+/* --- Simulation Area --- */
+#sim-container {
+position: relative;
+background-color: #000;
+overflow: hidden;
+display: flex;
+justify-content: center;
+align-items: center;
+}
+
+canvas {
+width: 100%;
+height: 100%;
+}
+
+.overlay-message {
+position: absolute;
+top: 50%;
+left: 50%;
+transform: translate(-50%, -50%);
+background: rgba(239, 68, 68, 0.9);
+color: white;
+padding: 20px 40px;
+border-radius: 8px;
+text-align: center;
+display: none;
+box-shadow: 0 0 30px rgba(239, 68, 68, 0.4);
+border: 2px solid white;
+z-index: 20;
+}
+
+.overlay-message h2 { margin-top: 0; }
+.overlay-message button {
+background: white;
+color: var(--danger);
+border: none;
+padding: 10px 20px;
+font-weight: bold;
+cursor: pointer;
+border-radius: 4px;
+margin-top: 10px;
+font-size: 1rem;
+}
+.overlay-message button:hover { background: #f1f1f1; }
+
+/* --- Data Display --- */
+.data-grid {
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 10px;
+}
+
+.data-card {
+background: rgba(255,255,255,0.05);
+padding: 10px;
+border-radius: 4px;
+text-align: center;
+}
+
+.data-label { font-size: 0.75rem; color: var(--text-dim); margin-bottom: 4px; }
+.data-val { font-size: 1.1rem; font-weight: bold; font-family: 'Courier New', monospace; }
+.unit { font-size: 0.8rem; color: var(--text-dim); }
+
+.progress-bar-bg {
+height: 6px;
+background: #334155;
+border-radius: 3px;
+margin-top: 5px;
+overflow: hidden;
+}
+.progress-bar-fill {
+height: 100%;
+background: var(--success);
+width: 0%;
+transition: width 0.2s, background-color 0.2s;
+}
+
+/* --- Educational Tooltip --- */
+.edu-note {
+font-size: 0.85rem;
+line-height: 1.4;
+color: #cbd5e1;
+background: rgba(14, 165, 233, 0.1);
+border-left: 3px solid var(--accent);
+padding: 10px;
+margin-top: auto;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+.main-container {
+grid-template-columns: 1fr;
+grid-template-rows: auto 400px auto;
+overflow-y: auto;
+}
+body { overflow: auto; height: auto; }
+.panel { border-right: none; border-bottom: 1px solid #334155; }
+}
+</style>
+</head>
+<body>
+
+<header>
+<div class="brand">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+<span>MAGLEV</span>SIM
+</div>
+<div class="system-status">
+SYSTEM STATE: <span id="status-text">STANDBY</span>
+<div id="status-indicator" class="status-dot"></div>
+</div>
+</header>
+
+<div class="main-container">
+<!-- LEFT PANEL: CONTROLS -->
+<aside class="panel">
+<h3>Power Systems</h3>
+<div class="control-group">
+<div class="control-header">
+<label>Voltage (V)</label>
+<span class="control-value"><span id="val-voltage">0</span> V</span>
+</div>
+<input type="range" id="input-voltage" min="0" max="1000" step="10" value="0">
+<div style="font-size: 0.75rem; color: #64748b; margin-top: 5px;">Source Power</div>
+</div>
+
+<div class="control-group">
+<div class="control-header">
+<label>Resistance (Ω)</label>
+<span class="control-value"><span id="val-resistance">10</span> Ω</span>
+</div>
+<input type="range" id="input-resistance" min="5" max="100" step="1" value="10">
+<div style="font-size: 0.75rem; color: #64748b; margin-top: 5px;">Coil Material Property</div>
+</div>
+
+<h3>Engineering Design</h3>
+
+<div class="control-group">
+<div class="control-header">
+<label>Coil Turns (N)</label>
+<span class="control-value"><span id="val-turns">500</span></span>
+</div>
+<input type="range" id="input-turns" min="100" max="2000" step="50" value="500">
+<div style="font-size: 0.75rem; color: #64748b; margin-top: 5px;">Magnetic Field Density</div>
+</div>
+
+<div class="control-group">
+<div class="control-header">
+<label>Train Mass (kg)</label>
+<span class="control-value"><span id="val-mass">2000</span> kg</span>
+</div>
+<input type="range" id="input-mass" min="1000" max="10000" step="100" value="2000">
+</div>
+
+<div class="edu-note">
+<strong>Physics Hint:</strong> Levitation occurs when Magnetic Force ($F \propto B^2$) exceeds Gravity ($mg$). Increase Voltage or Coil Turns to lift heavier trains.
+</div>
+</aside>
+
+<!-- CENTER PANEL: SIMULATION -->
+<main id="sim-container">
+<canvas id="simCanvas"></canvas>
+<div id="overheat-overlay" class="overlay-message">
+<h2>⚠️ CRITICAL FAILURE</h2>
+<p>Circuit Breaker Tripped! The coils overheated due to excessive current.</p>
+<p>Reduce Voltage or Increase Resistance before resetting.</p>
+<button onclick="resetBreaker()">RESET SYSTEM</button>
+</div>
+</main>
+
+<!-- RIGHT PANEL: ANALYTICS -->
+<aside class="panel panel-right">
+<h3>Telemetry</h3>
+
+<div class="data-grid">
+<div class="data-card">
+<div class="data-label">CURRENT (I)</div>
+<div class="data-val" id="disp-current">0.0</div>
+<div class="unit">Amperes</div>
+</div>
+<div class="data-card">
+<div class="data-label">MAG FIELD (B)</div>
+<div class="data-val" id="disp-field">0.0</div>
+<div class="unit">Tesla (mT)</div>
+</div>
+</div>
+
+<div class="data-grid">
+<div class="data-card">
+<div class="data-label">VELOCITY</div>
+<div class="data-val" id="disp-speed">0</div>
+<div class="unit">km/h</div>
+</div>
+<div class="data-card">
+<div class="data-label">POWER</div>
+<div class="data-val" id="disp-power">0</div>
+<div class="unit">kW</div>
+</div>
+</div>
+
+<h3>System Health</h3>
+<div>
+<div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:4px;">
+<span>Thermal Load</span>
+<span id="disp-temp">25°C</span>
+</div>
+<div class="progress-bar-bg">
+<div id="bar-heat" class="progress-bar-fill" style="width: 0%; background-color: var(--success);"></div>
+</div>
+</div>
+
+<div>
+<div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:4px; margin-top: 15px;">
+<span>Levitation Height</span>
+<span id="disp-gap">0 mm</span>
+</div>
+<div class="progress-bar-bg">
+<div id="bar-gap" class="progress-bar-fill" style="width: 0%; background-color: var(--accent);"></div>
+</div>
+</div>
+
+<h3>Sustainability</h3>
+<div class="data-card" style="border: 1px solid var(--success); background: rgba(34, 197, 94, 0.1);">
+<div class="data-label" style="color: var(--success);">CO₂ AVOIDED</div>
+<div class="data-val" id="disp-co2" style="color: var(--success);">0.00</div>
+<div class="unit">kg vs Diesel</div>
+</div>
+
+<div class="edu-note" style="background: rgba(255, 255, 255, 0.05); border-left: 3px solid #94a3b8;">
+<strong>Did you know?</strong> Because Maglevs don't touch the track, they eliminate rolling friction. The main energy cost is pushing air out of the way (Aerodynamic Drag).
+</div>
+</aside>
+</div>
+
+<script>
+// --- Configuration & Physics Constants ---
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+// Physics constants (scaled for simulation)
+const MU_0 = 0.0001; // Magnetic permeability scale
+const GRAVITY = 9.8;
+const LIFT_CONSTANT = 0.5; // Tuning factor for lift
+const DRAG_COEFFICIENT = 0.002;
+const FRICTION_COEFFICIENT = 800; // High friction when touching track
+const MAX_TEMP = 300; // Degrees C where breaker trips
+const AMBIENT_TEMP = 25;
+const COOLING_RATE = 0.5;
+const HEATING_FACTOR = 0.02;
+
+// --- State Variables ---
+const state = {
+voltage: 0,
+resistance: 10,
+turns: 500,
+mass: 2000,
+// Computed
+current: 0,
+magneticField: 0,
+temperature: AMBIENT_TEMP,
+// Motion
+positionX: 0, // In meters (virtual)
+velocity: 0, // m/s
+acceleration: 0,
+levitationGap: 0, // mm (0 to 100)
+// System
+isBreakerTripped: false,
+trackOffset: 0, // For animation scrolling
+distanceTraveled: 0 // km
+};
+
+// --- DOM Elements ---
+const ui = {
+inputs: {
+voltage: document.getElementById('input-voltage'),
+resistance: document.getElementById('input-resistance'),
+turns: document.getElementById('input-turns'),
+mass: document.getElementById('input-mass')
+},
+displays: {
+voltage: document.getElementById('val-voltage'),
+resistance: document.getElementById('val-resistance'),
+turns: document.getElementById('val-turns'),
+mass: document.getElementById('val-mass'),
+current: document.getElementById('disp-current'),
+field: document.getElementById('disp-field'),
+speed: document.getElementById('disp-speed'),
+power: document.getElementById('disp-power'),
+temp: document.getElementById('disp-temp'),
+gap: document.getElementById('disp-gap'),
+co2: document.getElementById('disp-co2'),
+statusText: document.getElementById('status-text'),
+statusDot: document.getElementById('status-indicator'),
+barHeat: document.getElementById('bar-heat'),
+barGap: document.getElementById('bar-gap')
+},
+overlays: {
+overheat: document.getElementById('overheat-overlay')
+}
+};
+
+// --- Event Listeners ---
+Object.keys(ui.inputs).forEach(key => {
+ui.inputs[key].addEventListener('input', (e) => {
+state[key] = parseFloat(e.target.value);
+ui.displays[key].innerText = state[key];
+});
+});
+
+function resetBreaker() {
+state.temperature = AMBIENT_TEMP;
+state.isBreakerTripped = false;
+state.velocity = 0;
+state.levitationGap = 0;
+ui.inputs.voltage.value = 0;
+state.voltage = 0;
+ui.displays.voltage.innerText = "0";
+ui.overlays.overheat.style.display = 'none';
+ui.displays.statusDot.classList.remove('danger');
+updateSystemStatus();
+}
+
+function updateSystemStatus() {
+if (state.isBreakerTripped) {
+ui.displays.statusText.innerText = "FAILURE";
+ui.displays.statusText.style.color = "var(--danger)";
+ui.displays.statusDot.className = "status-dot danger";
+} else if (state.levitationGap > 5 && state.velocity > 1) {
+ui.displays.statusText.innerText = "CRUISING";
+ui.displays.statusText.style.color = "var(--success)";
+ui.displays.statusDot.className = "status-dot active";
+} else if (state.levitationGap > 5) {
+ui.displays.statusText.innerText = "LEVITATING";
+ui.displays.statusText.style.color = "var(--accent)";
+ui.displays.statusDot.className = "status-dot active";
+} else {
+ui.displays.statusText.innerText = "STANDBY";
+ui.displays.statusText.style.color = "#94a3b8";
+ui.displays.statusDot.className = "status-dot";
+}
+}
+
+// --- Physics Engine ---
+function updatePhysics(dt) {
+if (state.isBreakerTripped) {
+// System cooling down
+state.temperature = Math.max(AMBIENT_TEMP, state.temperature - COOLING_RATE);
+state.current = 0;
+state.magneticField = 0;
+// Train falls and stops
+state.levitationGap = Math.max(0, state.levitationGap - 50 * dt);
+state.velocity = Math.max(0, state.velocity - 10 * dt);
+return;
+}
+
+// 1. Electrical Calculation
+state.current = state.voltage / state.resistance;
+// 2. Heat Calculation (I^2 * R)
+// Simplified heating model
+const heatGen = (Math.pow(state.current, 2) * state.resistance) / 5000;
+state.temperature = Math.max(AMBIENT_TEMP, state.temperature + (heatGen * HEATING_FACTOR) - (COOLING_RATE * 0.1));
+// Check Breaker
+if (state.temperature > MAX_TEMP) {
+state.isBreakerTripped = true;
+ui.overlays.overheat.style.display = 'block';
+return;
+}
+
+// 3. Magnetic Field (B = u0 * n * I)
+// Result in milliTesla-ish scale for display
+state.magneticField = MU_0 * state.turns * state.current * 1000;
+
+// 4. Levitation Physics
+// Force Up = k * B^2
+// Force Down = m * g
+const liftForce = LIFT_CONSTANT * Math.pow(state.magneticField, 1.5); // 1.5 power for tuning
+const gravityForce = state.mass * GRAVITY / 1000; // Scaled down
+
+let verticalAccel = 0;
+if (liftForce > gravityForce) {
+verticalAccel = (liftForce - gravityForce) / state.mass * 500;
+state.levitationGap = Math.min(100, state.levitationGap + verticalAccel * dt);
+} else {
+state.levitationGap = Math.max(0, state.levitationGap - 50 * dt); // Gravity fall
+}
+
+// 5. Propulsion Physics
+// Only moves if levitated (or very high friction if dragging)
+const isLevitated = state.levitationGap > 5;
+// Propulsion force is proportional to Field Strength * Current (Lorentz force concept simplified)
+// Engineers use linear motors where Force ~ Current * Phase_Difference.
+// Here we assume optimal phasing automatically.
+let propulsionForce = 0;
+if (state.current > 0) {
+propulsionForce = state.magneticField * state.current * 0.05;
+}
+
+// Drag Forces
+const airDrag = 0.5 * DRAG_COEFFICIENT * Math.pow(state.velocity, 2);
+let friction = 0;
+if (!isLevitated) {
+friction = (state.mass * GRAVITY * 0.5); // High friction on rails
+// If force isn't enough to overcome static friction
+if (propulsionForce < friction && state.velocity < 0.1) {
+propulsionForce = 0;
+state.velocity = 0;
+}
+}
+
+const netForce = propulsionForce - airDrag - (isLevitated ? 0 : friction);
+state.acceleration = netForce / state.mass;
+
+state.velocity += state.acceleration * dt;
+if (state.velocity < 0) state.velocity = 0; // No reverse for this simple sim
+
+// 6. Distance & Animation state
+state.positionX += state.velocity * dt;
+state.trackOffset = (state.trackOffset + state.velocity * dt * 50) % 100; // 50px per unit
+state.distanceTraveled += (state.velocity * dt) / 1000;
+}
+
+// --- Visualization Engine ---
+function draw() {
+// Resize logic
+canvas.width = document.getElementById('sim-container').clientWidth;
+canvas.height = document.getElementById('sim-container').clientHeight;
+const w = canvas.width;
+const h = canvas.height;
+const centerY = h / 2 + 50;
+
+// Clear
+ctx.fillStyle = '#000000';
+ctx.fillRect(0, 0, w, h);
+
+// Draw Background Grid (parallax)
+ctx.strokeStyle = '#1e293b';
+ctx.lineWidth = 1;
+const gridSpeed = state.velocity * 0.2;
+const gridOffset = (Date.now() * gridSpeed / 1000) % 50;
+ctx.beginPath();
+for(let i = -gridOffset; i < w; i+=50) {
+ctx.moveTo(i, 0);
+ctx.lineTo(i, h);
+}
+ctx.stroke();
+
+// --- Draw Track (Stator Coils) ---
+const coilWidth = 40;
+const coilGap = 10;
+const coilSpacing = coilWidth + coilGap;
+const scrollX = state.trackOffset; // % coilSpacing;
+const numCoils = Math.ceil(w / coilSpacing) + 1;
+
+for (let i = -1; i < numCoils; i++) {
+const x = i * coilSpacing - scrollX;
+// Color based on active state (simulating 3-phase AC ripple)
+// We make them pulse based on speed to visualize propulsion frequency
+const phase = (Date.now() / 100) * (state.velocity * 0.1 + 2);
+const isActive = Math.sin(i + phase) > 0 && state.voltage > 10 && !state.isBreakerTripped;
+
+ctx.fillStyle = isActive ? '#3b82f6' : '#334155';
+// Track Block
+ctx.fillRect(x, centerY, coilWidth, 30);
+// Coil windings visual
+ctx.fillStyle = isActive ? '#60a5fa' : '#475569';
+ctx.fillRect(x + 5, centerY + 5, coilWidth - 10, 20);
+
+// Magnetic Field Lines (if active)
+if (isActive && state.magneticField > 100) {
+ctx.strokeStyle = `rgba(14, 165, 233, ${Math.min(1, state.magneticField/5000)})`;
+ctx.lineWidth = 2;
+ctx.beginPath();
+// Arcs showing field
+ctx.moveTo(x + 10, centerY);
+ctx.quadraticCurveTo(x + 20, centerY - 30, x + 30, centerY);
+ctx.stroke();
+}
+}
+
+// --- Draw Train (Rotor/Magnets) ---
+const trainW = 220;
+const trainH = 50;
+const trainX = w / 2 - trainW / 2;
+const levY = centerY - trainH - (state.levitationGap / 3); // Scale gap for visual
+
+// Shadow (indicates height)
+const shadowWidth = trainW * (1 - state.levitationGap/400);
+const shadowAlpha = 1 - Math.min(1, state.levitationGap/150);
+ctx.fillStyle = `rgba(0,0,0,${shadowAlpha})`;
+ctx.fillRect(trainX + (trainW - shadowWidth)/2, centerY + 5, shadowWidth, 10);
+
+// Train Body
+// Gradient
+const grd = ctx.createLinearGradient(trainX, levY, trainX, levY + trainH);
+grd.addColorStop(0, '#e2e8f0');
+grd.addColorStop(1, '#94a3b8');
+ctx.fillStyle = grd;
+
+// Streamlined shape
+ctx.beginPath();
+ctx.moveTo(trainX, levY + trainH); // Bottom Left
+ctx.lineTo(trainX + trainW, levY + trainH); // Bottom Right
+ctx.lineTo(trainX + trainW, levY + 15); // Nose bottom
+ctx.quadraticCurveTo(trainX + trainW - 20, levY, trainX + trainW - 60, levY); // Nose curve
+ctx.lineTo(trainX + 40, levY); // Roof
+ctx.quadraticCurveTo(trainX, levY, trainX, levY + trainH); // Rear
+ctx.fill();
+
+// Windows
+ctx.fillStyle = '#0f172a';
+ctx.beginPath();
+ctx.roundRect(trainX + 20, levY + 10, 40, 15, 2);
+ctx.roundRect(trainX + 70, levY + 10, 40, 15, 2);
+ctx.roundRect(trainX + 120, levY + 10, 40, 15, 2);
+ctx.fill();
+
+// Train Magnets (Undercarriage)
+ctx.fillStyle = '#ef4444'; // North pole red
+ctx.fillRect(trainX + 30, levY + trainH, 40, 8);
+ctx.fillRect(trainX + 90, levY + trainH, 40, 8);
+ctx.fillRect(trainX + 150, levY + trainH, 40, 8);
+
+// --- Velocity Particles (Air) ---
+if (state.velocity > 10) {
+ctx.fillStyle = 'rgba(255,255,255,0.2)';
+for(let i=0; i<5; i++) {
+const px = trainX + trainW + Math.random() * 50;
+const py = levY + Math.random() * trainH;
+const length = state.velocity * 0.1;
+ctx.fillRect(px, py, length, 1);
+}
+}
+}
+
+// --- Data Update Loop ---
+function updateUI() {
+// Numbers
+ui.displays.current.innerText = state.current.toFixed(1);
+ui.displays.field.innerText = (state.magneticField).toFixed(0);
+// Convert m/s to km/h
+const kmh = state.velocity * 3.6;
+ui.displays.speed.innerText = kmh.toFixed(0);
+// Power kW
+const power = (state.voltage * state.current) / 1000;
+ui.displays.power.innerText = power.toFixed(1);
+
+// Temp
+ui.displays.temp.innerText = state.temperature.toFixed(0) + "°C";
+const heatPercent = Math.min(100, (state.temperature / MAX_TEMP) * 100);
+ui.displays.barHeat.style.width = heatPercent + "%";
+ui.displays.barHeat.style.backgroundColor = heatPercent > 80 ? "var(--danger)" : (heatPercent > 50 ? "#f59e0b" : "var(--success)");
+
+// Gap
+ui.displays.gap.innerText = state.levitationGap.toFixed(0) + " mm";
+const gapPercent = Math.min(100, state.levitationGap);
+ui.displays.barGap.style.width = gapPercent + "%";
+
+// CO2
+// Diesel train approx 0.08 kg CO2 per ton-km
+// Maglev (assuming clean energy mix for this sim) approx 0.02 kg
+// Savings = distance * tons * 0.06
+const tons = state.mass / 1000;
+const savings = state.distanceTraveled * tons * 0.06 * 1000; // *1000 to see number grow faster for fun
+ui.displays.co2.innerText = savings.toFixed(2);
+
+updateSystemStatus();
+}
+
+// --- Main Loop ---
+let lastTime = 0;
+function loop(timestamp) {
+if (!lastTime) lastTime = timestamp;
+const dt = (timestamp - lastTime) / 1000; // Seconds
+lastTime = timestamp;
+
+updatePhysics(dt);
+draw();
+updateUI();
+requestAnimationFrame(loop);
+}
+
+// Start
+requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>
